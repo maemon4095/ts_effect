@@ -12,8 +12,6 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
     #process: Process<T>;
     // deno-lint-ignore ban-types
     #handlers: Map<Function, BothEffectHandler<Effect<unknown>, unknown, Effect<unknown>>>;
-
-
     // deno-lint-ignore ban-types
     constructor(process: Process<T>, handlers: Map<Function, BothEffectHandler<Effect<unknown>, unknown, Effect<unknown>>>) {
         this.#process = process;
@@ -21,8 +19,9 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
     }
 
     [Symbol.iterator]() {
-        function* body(this: Handle<T, E>) {
-            const iter = this.#process[Symbol.iterator]();
+        type This = typeof this;
+        function* body(self: This) {
+            const iter = self.#process[Symbol.iterator]();
             let handleResult: unknown = undefined;
             while (true) {
                 const { done, value } = iter.next(handleResult);
@@ -30,7 +29,7 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
                     return value;
                 }
 
-                const pair = this.#handlers.get(value.constructor);
+                const pair = self.#handlers.get(value.constructor);
                 if (pair === undefined) {
                     handleResult = yield* value as E;
                     continue;
@@ -45,7 +44,7 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
             }
         }
 
-        return body.bind(this)();
+        return body(this);
     }
 
     with<E1 extends E, T1, E2 extends Effect<T1>>(ctor: abstract new (...args: unknown[]) => E1, handler: EffectHandler<E1, T1, E2>) {
@@ -71,13 +70,12 @@ export function handle<T, E extends Effect<unknown>>(process: Process<T, E>) {
 
 export abstract class Effect<T> {
     [Symbol.iterator]() {
-        // deno-lint-ignore no-this-alias
-        const self = this;
-        function* body() {
+        type This = typeof this;
+        function* body(self: This) {
             const ret: T = yield self;
             return ret;
         }
-        return body();
+        return body(this);
     }
 }
 
@@ -96,12 +94,10 @@ export class UnhandledEffectError extends Error {
 
 export function execute<T>(process: Process<T, never>): T {
     const iter = process[Symbol.iterator]();
-    while (true) {
-        const { done, value } = iter.next();
-        if (done) {
-            return value;
-        }
-
-        throw new UnhandledEffectError(value);
+    const { done, value } = iter.next();
+    if (done) {
+        return value;
     }
+
+    throw new UnhandledEffectError(value);
 }
