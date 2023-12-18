@@ -1,4 +1,4 @@
-export type Process<T, E extends Effect<unknown> = Effect<unknown>> = { [Symbol.iterator](): Iterator<E, T, unknown>; };
+export type Process<T, E extends Effect<unknown>> = { [Symbol.iterator](): Iterator<E, T, unknown>; };
 export type EffectHandler<E0 extends Effect<unknown>, T, E1 extends Effect<T>> = (effect: E0) => Process<T, E1>;
 export type PureEffectHandler<E extends Effect<unknown>, T> = (effect: E) => T;
 
@@ -6,14 +6,14 @@ type BothEffectHandler<E0 extends Effect<unknown>, T, E1 extends Effect<T>> =
     { type: "pure"; handler: PureEffectHandler<E0, T>; } |
     { type: "eff"; handler: EffectHandler<E0, T, E1>; };
 
-type ProcessResult<P extends Process<unknown>> = P extends Process<infer X> ? X : never;
+type ProcessResult<P extends Process<unknown, Effect<unknown>>> = P extends Process<infer X, Effect<unknown>> ? X : never;
 
 export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
-    #process: Process<T>;
+    #process: Process<T, Effect<unknown>>;
     // deno-lint-ignore ban-types
     #handlers: Map<Function, BothEffectHandler<Effect<unknown>, unknown, Effect<unknown>>>;
     // deno-lint-ignore ban-types
-    constructor(process: Process<T>, handlers: Map<Function, BothEffectHandler<Effect<unknown>, unknown, Effect<unknown>>>) {
+    constructor(process: Process<T, Effect<unknown>>, handlers: Map<Function, BothEffectHandler<Effect<unknown>, unknown, Effect<unknown>>>) {
         this.#process = process;
         this.#handlers = handlers;
     }
@@ -43,7 +43,6 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
                 }
             }
         }
-
         return body(this);
     }
 
@@ -68,7 +67,7 @@ export function handle<T, E extends Effect<unknown>>(process: Process<T, E>) {
     return new Handle<T, E>(process, new Map());
 }
 
-export abstract class Effect<T> {
+export abstract class Effect<out T> {
     [Symbol.iterator]() {
         type This = typeof this;
         function* body(self: This) {
@@ -78,7 +77,6 @@ export abstract class Effect<T> {
         return body(this);
     }
 }
-
 
 export class UnhandledEffectError extends Error {
     #effect;

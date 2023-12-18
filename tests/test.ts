@@ -3,10 +3,11 @@ import { Effect, UnhandledEffectError, execute, handle } from "../src/index.ts";
 class GetStr extends Effect<string> { }
 class Random extends Effect<number> { }
 const random = Object.freeze(new Random());
+const getstr = Object.freeze(new GetStr());
 
 function* proc() {
     const a = yield* random;
-    const b = yield* new GetStr();
+    const b = yield* getstr;
 
     return b.repeat(a * 10);
 }
@@ -19,7 +20,8 @@ try {
     console.log(execute(pureProc));
 } catch (e) {
     if (e instanceof UnhandledEffectError) {
-        console.log(e.effect);
+        console.log("unhandled effect:", e.effect);
+    } else {
+        console.log("unexpected error:", e);
     }
-
 }
