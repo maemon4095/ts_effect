@@ -1,6 +1,16 @@
-export type Process<T, E extends Effect<unknown>> = { [Symbol.iterator](): Iterator<E, T, unknown>; };
-export type EffectHandler<E0 extends Effect<unknown>, T, E1 extends Effect<T>> = (effect: E0) => Process<T, E1>;
-export type PureEffectHandler<E extends Effect<unknown>, T> = (effect: E) => T;
+export abstract class Effect<out T> {
+    [Symbol.iterator]() {
+        type This = typeof this;
+        function* body(self: This) {
+            const ret: T = yield self;
+            return ret;
+        }
+        return body(this);
+    }
+}
+export type Process<out T, out E extends Effect<unknown>> = { [Symbol.iterator](): Iterator<E, T, unknown>; };
+export type EffectHandler<in E0 extends Effect<unknown>, out T, out E1 extends Effect<T>> = (effect: E0) => Process<T, E1>;
+export type PureEffectHandler<in E extends Effect<unknown>, out T> = (effect: E) => T;
 
 type BothEffectHandler<E0 extends Effect<unknown>, T, E1 extends Effect<T>> =
     { type: "pure"; handler: PureEffectHandler<E0, T>; } |
@@ -48,16 +58,14 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
 
     with<E1 extends E, T1, E2 extends Effect<T1>>(ctor: abstract new (...args: unknown[]) => E1, handler: EffectHandler<E1, T1, E2>) {
         const handlers = new Map(this.#handlers);
-        // deno-lint-ignore no-explicit-any
-        handlers.set(ctor, { type: "eff", handler: handler as unknown as any });
+        handlers.set(ctor, { type: "eff", handler: handler as unknown as EffectHandler<Effect<unknown>, unknown, Effect<unknown>> });
 
         return new Handle<T, Exclude<E, E1> | E2>(this.#process, handlers);
     }
 
     withPure<E1 extends E>(ctor: abstract new (...args: unknown[]) => E1, handler: (e: E1) => ProcessResult<E1>) {
         const handlers = new Map(this.#handlers);
-        // deno-lint-ignore no-explicit-any
-        handlers.set(ctor, { type: "pure", handler: handler as unknown as any });
+        handlers.set(ctor, { type: "pure", handler: handler as unknown as EffectHandler<Effect<unknown>, unknown, Effect<unknown>> });
 
         return new Handle<T, Exclude<E, E1>>(this.#process, handlers);
     }
@@ -65,17 +73,6 @@ export class Handle<T, E extends Effect<unknown>> implements Process<T, E> {
 
 export function handle<T, E extends Effect<unknown>>(process: Process<T, E>) {
     return new Handle<T, E>(process, new Map());
-}
-
-export abstract class Effect<out T> {
-    [Symbol.iterator]() {
-        type This = typeof this;
-        function* body(self: This) {
-            const ret: T = yield self;
-            return ret;
-        }
-        return body(this);
-    }
 }
 
 export class UnhandledEffectError extends Error {

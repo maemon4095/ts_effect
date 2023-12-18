@@ -8,7 +8,6 @@ const getstr = Object.freeze(new GetStr());
 function* proc() {
     const a = yield* random;
     const b = yield* getstr;
-
     return b.repeat(a * 10);
 }
 const pureProc =
